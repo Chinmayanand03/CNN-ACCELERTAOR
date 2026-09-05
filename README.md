@@ -110,20 +110,24 @@ flowchart TD
 
 The Vivado block design integrates the Zynq-7000 Processing System (`processing_system7_0`) with the HLS-generated CNN accelerator (`conv1_hls_0`).
 
-Key system components include:
-- **`processing_system7_0`**: Dual ARM Cortex-A9 processor block managing system control, clock generation, and DDR memory controller.
-- **`conv1_hls_0`**: Hardware accelerator IP implementing 2D convolution.
-- **`axi_smc`**: AXI SmartConnect routing memory transactions.
-- **`axi_mem_intercon`**: AXI Interconnect bridging memory master ports.
-- **`DDR` & `FIXED_IO`**: System memory interfaces.
+### Hardware Component Overview
+
+| Component Block | Module Type | Description |
+| :--- | :--- | :--- |
+| `processing_system7_0` | Zynq-7000 PS | Dual ARM Cortex-A9 processor managing control flow, system clock, and DDR controller |
+| `conv1_hls_0` | HLS Accelerator IP | Hardware accelerator performing 2D convolution using unrolled MAC units |
+| `axi_smc` | AXI SmartConnect | High-performance interconnect routing memory transactions between IP and PS |
+| `axi_mem_intercon` | AXI Interconnect | AXI bus matrix bridging master and slave interfaces across clock domains |
+| `DDR` & `FIXED_IO` | External System Interfaces | System DDR SDRAM memory and fixed MIO/IOPAD physical pins |
+
+### AXI Interface Topology
 
 The accelerator provides three separate AXI Master memory bundles (`m_axi_gmem0`, `m_axi_gmem1`, `m_axi_gmem2`) to maximize concurrent read/write memory bandwidth over high-performance Zynq slave ports.
 
-![CNN Accelerator Architecture](Vivado/cnn_accelerator_architecture.png)
-*Figure 1. Hardware Architecture of the Proposed CNN Accelerator on Zynq-7000 SoC*
-
-![AXI Memory Interconnect](Vivado/axi_memory_interconnect.png)
-*Figure 2. AXI Memory Interconnect for CNN Accelerator Memory Access*
+- **`s_axilite` (bundle `control`)**: Connected to Zynq M_AXI_GP0 for register-level start, stop, and status polling.
+- **`m_axi_gmem0`**: Direct AXI Master memory bus streaming input feature maps from DDR SDRAM.
+- **`m_axi_gmem1`**: Direct AXI Master memory bus fetching convolution weights and bias parameters.
+- **`m_axi_gmem2`**: Direct AXI Master memory bus writing computed 32-bit output feature tensors back to DDR.
 
 ---
 
@@ -141,38 +145,76 @@ CNN-ACCELERTAOR/
 │   ├── cnn_accelerator_architecture.png    # Top-Level Vivado IP Integrator Block Diagram
 │   └── axi_memory_interconnect.png         # AXI Memory Interconnect Topology
 ├── Results/
-│   ├── Resource_Utilization.png            # Post-Implementation FPGA Resource Usage
+│   ├── Resource_Utilization.png            # Post-Implementation FPGA Resource Usage Report
 │   ├── Timing_Summary.png                  # Post-Implementation Timing Closure Summary
-│   └── Report_Power.png                    # Vivado Post-Implementation Power Estimation
+│   └── Report_Power.png                    # Vivado Post-Implementation Power Estimation Report
 └── image_2026-09-04_232847702.png          # System Diagram / Synthesis Reference Image
 ```
 
 ---
 
-## Implementation Results & Evaluation
+## Implementation Results & Technical Evaluation
 
-The design was fully synthesized, placed, and routed using Xilinx Vivado targeting the Zynq-7000 FPGA family.
+The design was fully synthesized, placed, and routed using Xilinx Vivado targeting the Zynq-7000 FPGA family (`xc7z020clg400-1`). The empirical metrics extracted from the post-implementation reports are presented below.
 
-### 1. Resource Utilization
+### 1. FPGA Post-Implementation Resource Utilization
 
-The post-implementation resource usage report detailing Lookup Tables (LUTs), Flip-Flops (FFs), Block RAMs (BRAMs), and DSP48E slices is shown below:
+The table below summarizes the post-implementation resource consumption across the FPGA fabric, broken down by sub-modules and overall system utilization:
 
-![Resource Utilization](Results/Resource_Utilization.png)
-*Figure 3. Post-Implementation FPGA Resource Utilization Report*
+| Module / Component Name | Slice LUTs (53,200) | Slice Registers / FFs (106,400) | Block RAM Tile (140) | DSP48E Slices (220) | Bonded IOPADs (130) | BUFGCTRL (32) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Top Wrapper (`cnn_og_design_wrapper`)** | **26,669 (50.13%)** | **22,318 (20.98%)** | **1 (0.71%)** | **220 (100.00%)** | **130 (100.00%)** | **1 (3.13%)** |
+| ├── **CNN Accelerator (`conv1_hls_0`)** | 23,773 (44.69%) | 18,980 (17.84%) | 1 (0.71%) | 220 (100.00%) | 0 (0.00%) | 0 (0.00%) |
+| ├── **AXI Interconnect (`axi_mem_intercon`)** | 1,831 (3.44%) | 2,239 (2.10%) | 0 (0.00%) | 0 (0.00%) | 0 (0.00%) | 0 (0.00%) |
+| └── **AXI SmartConnect (`axi_smc`)** | 1,022 (1.92%) | 1,059 (0.99%) | 0 (0.00%) | 0 (0.00%) | 0 (0.00%) | 0 (0.00%) |
 
-### 2. Timing Closure Analysis
+#### Resource Utilization Technical Analysis
+- **DSP Slices**: The accelerator utilizes 100% of the available DSP48E slices (220/220) on the target Zynq-7000 device due to loop unrolling (`#pragma HLS UNROLL`) of the $3 \times 3 \times 3$ multiply-accumulate operations, achieving high parallel computation density.
+- **Slice LUTs & FFs**: Logic utilization is well-balanced, consuming 50.13% of Slice LUTs and 20.98% of Flip-Flops, leaving sufficient logic margin for system routing and control logic.
+- **BRAM Slices**: Only 1 BRAM tile is required for local buffering, as feature maps and weights are streamed directly via AXI Master interfaces from external DDR memory.
 
-Post-implementation timing analysis confirms successful timing closure with positive Worst Negative Slack (WNS) and Worst Hold Slack (WHS):
+---
 
-![Timing Summary](Results/Timing_Summary.png)
-*Figure 4. Post-Implementation Timing Summary Report*
+### 2. Post-Implementation Timing Closure Analysis
 
-### 3. Power Estimation
+Post-implementation timing analysis confirms successful timing closure with positive slack across setup, hold, and pulse width checks:
 
-On-chip power consumption was analyzed post-implementation using Vivado Power Analysis tools:
+| Timing Parameter Category | Worst Slack | Total Negative Slack (TNS) | Failing Endpoints | Total Analyzed Endpoints | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Setup Timing Check (WNS)** | **+10.785 ns** | 0.000 ns | 0 | 67,083 | **Met** |
+| **Hold Timing Check (WHS)** | **+0.045 ns** | 0.000 ns | 0 | 67,083 | **Met** |
+| **Pulse Width Slack Check (WPWS)** | **+8.750 ns** | 0.000 ns | 0 | 22,978 | **Met** |
+| **Overall Design Timing** | — | — | **0** | **67,083** | **All Constraints Met** |
 
-![Power Report](Results/Report_Power.png)
-*Figure 5. Vivado Post-Implementation Power Estimation Report*
+#### Timing Performance Analysis
+- **Worst Negative Slack (WNS)**: A high positive setup slack margin of **+10.785 ns** ensures reliable operation without timing violations.
+- **Zero Failing Endpoints**: Across 67,083 timing endpoints, zero timing failures occurred during post-routing analysis.
+
+---
+
+### 3. Vivado Post-Implementation Power Estimation
+
+On-chip power consumption was estimated post-implementation using Vivado Power Analysis tools under typical operating conditions:
+
+| Power Category / Component Subsystem | Estimated Power (Watts) | Percentage of Category | Percentage of Total Power |
+| :--- | :--- | :--- | :--- |
+| **Dynamic Power Total** | **1.540 W** | **100%** | **91.89%** |
+| ├── **Processing System 7 (`PS7`)** | 1.526 W | 99.09% | 91.05% |
+| ├── **Clock Tree (`Clocks`)** | 0.007 W | 0.45% | 0.42% |
+| ├── **Signals & Interconnect (`Signals`)** | 0.004 W | 0.26% | 0.24% |
+| └── **Logic Slices (`Logic`)** | 0.004 W | 0.26% | 0.24% |
+| **Device Static Power (Leakage)** | **0.136 W** | — | **8.11%** |
+| **Total On-Chip Thermal Power** | **1.676 W** | — | **100.00%** |
+
+#### Thermal Operating Conditions
+
+| Thermal Metric Parameter | Metric Value | Unit |
+| :--- | :--- | :--- |
+| **Estimated Junction Temperature** | 44.3 | °C |
+| **Ambient Temperature Baseline** | 25.0 | °C |
+| **Thermal Margin Available** | 40.7 (3.4 W) | °C |
+| **Effective Thermal Resistance ($\Theta JA$)** | 11.5 | °C/W |
+| **Power Analysis Confidence Level** | Medium (Vectorless Activity Analysis) | — |
 
 > **Power Analysis Classification Note**: The reported power metrics represent Vivado post-implementation estimated on-chip thermal power based on switching activity models. Physical hardware power measurements using external power meters/shunts on a physical FPGA development board remain pending.
 
