@@ -2,11 +2,11 @@
 
 ## Overview
 
-This project presents the design, C testbench simulation, High-Level Synthesis (HLS) modeling, and FPGA post-implementation evaluation of a CNN convolution accelerator targeting an AMD/Xilinx Zynq-7000 FPGA platform (`xc7z020clg400-1`).
+This project presents the design, C testbench simulation, High-Level Synthesis (HLS) modeling, and technical evaluation of a CNN convolution accelerator targeting an AMD/Xilinx Zynq-7000 FPGA platform (`xc7z020clg400-1`).
 
 The convolution computation is implemented in C ([`Source_Code/conv1_hls.c`](Source_Code/conv1_hls.c)) and synthesized into RTL hardware using High-Level Synthesis (HLS). The HLS accelerator IP (`conv1_hls_0`) is configured with AXI4-Lite control and AXI4 Master memory interfaces (`m_axi_gmem0`, `m_axi_gmem1`, `m_axi_gmem2`) to interface with the Zynq-7000 Processing System (`processing_system7_0`).
 
-The implemented design is evaluated using FPGA post-implementation resource utilization, post-implementation timing closure analysis, and Vivado power estimation. C testbench simulation ([`Source_Code/conv1_hlstb.c`](Source_Code/conv1_hlstb.c)) was executed to verify algorithmic functional correctness.
+The implemented design is evaluated using HLS synthesis resource utilization, timing analysis, and power estimation. C testbench simulation ([`Source_Code/conv1_hlstb.c`](Source_Code/conv1_hlstb.c)) was executed to verify algorithmic functional correctness.
 
 > **Note on Evaluation Scope**: Physical FPGA development board execution, real-time sensor input streaming, physical hardware-measured power, and end-to-end multi-layer CNN inference have not yet been performed and are identified as future work.
 
@@ -21,7 +21,7 @@ The objective of this project is to implement the first 2D convolution layer (`c
 The project focuses on:
 1. Hardware accelerator algorithm design and C-based HLS synthesis.
 2. IP packaging and AXI memory bus interface design for Zynq Processing System integration.
-3. Post-implementation FPGA resource utilization, timing closure analysis, and Vivado power estimation.
+3. HLS synthesis resource utilization, timing analysis, and power estimation.
 4. C testbench verification and ARM software co-design flow.
 
 ---
@@ -37,10 +37,10 @@ The project focuses on:
   - `m_axi_gmem1`: Dedicated AXI Master interface for fetching weights and biases.
   - `m_axi_gmem2`: Dedicated AXI Master interface for storing output feature maps.
 - **AXI Infrastructure Integration**: Designed for AXI SmartConnect (`axi_smc`) and AXI Memory Interconnect (`axi_mem_intercon`) routing to Zynq High-Performance (HP) slave ports.
-- **FPGA Synthesis & Post-Implementation Evaluation**:
-  - Post-Implementation Resource Utilization Analysis (LUTs, FFs, BRAMs, DSPs).
-  - Post-Implementation Timing Closure Analysis (WNS, WHS, WPWS).
-  - Vivado Post-Implementation Power Estimation & Thermal Analysis.
+- **FPGA Synthesis & HLS Evaluation**:
+  - HLS Synthesis Resource Utilization Analysis (LUTs, FFs, BRAMs, DSPs).
+  - Timing Closure Analysis (WNS, WHS, WPWS).
+  - Power Estimation & Thermal Analysis.
 
 ---
 
@@ -139,21 +139,21 @@ CNN-ACCELERTAOR/
 │   ├── cnn_accelerator_architecture.png    # Top-Level Vivado IP Integrator Block Diagram
 │   └── axi_memory_interconnect.png         # AXI Memory Interconnect Topology
 ├── Results/
-│   ├── Resource_Utilization.png            # Post-Implementation FPGA Resource Usage Report
-│   ├── Timing_Summary.png                  # Post-Implementation Timing Closure Summary
-│   └── Report_Power.png                    # Vivado Post-Implementation Power Estimation Report
+│   ├── Resource_Utilization.png            # FPGA Resource Usage Report
+│   ├── Timing_Summary.png                  # Timing Closure Summary
+│   └── Report_Power.png                    # Power Estimation Report
 └── image_2026-09-04_232847702.png          # System Diagram / Synthesis Reference Image
 ```
 
 ---
 
-## Implementation Results & Empirical Evaluation
+## HLS Synthesis Results & Technical Evaluation
 
-The design was synthesized, placed, and routed using Xilinx Vivado targeting the Zynq-7000 FPGA family (`xc7z020clg400-1`). The empirical metrics extracted from the post-implementation reports are presented in the structured tables below.
+The design was synthesized using AMD/Xilinx Vitis HLS and Vivado targeting the Zynq-7000 FPGA family (`xc7z020clg400-1`). The empirical metrics extracted from the synthesis reports are presented in the structured tables below.
 
-### 1. FPGA Post-Implementation Resource Utilization
+### 1. Vitis HLS Synthesis Resource Utilization
 
-The table below summarizes the post-implementation resource consumption across the FPGA fabric, broken down by sub-modules and overall system utilization:
+The table below summarizes the resource consumption estimates across the FPGA fabric, broken down by sub-modules and overall system utilization:
 
 | Module / Component Name | Slice LUTs (53,200) | Slice Registers / FFs (106,400) | Block RAM Tile (140) | DSP48E Slices (220) | Bonded IOPADs (130) | BUFGCTRL (32) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -169,9 +169,9 @@ The table below summarizes the post-implementation resource consumption across t
 
 ---
 
-### 2. Post-Implementation Timing Closure Analysis
+### 2. Vitis HLS Timing & Slack Analysis
 
-Post-implementation timing analysis confirms successful timing closure with positive slack across setup, hold, and pulse width checks:
+HLS synthesis timing analysis confirms positive slack across setup, hold, and pulse width checks:
 
 | Timing Parameter Category | Worst Slack | Total Negative Slack (TNS) | Failing Endpoints | Total Analyzed Endpoints | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -182,13 +182,13 @@ Post-implementation timing analysis confirms successful timing closure with posi
 
 #### Timing Performance Analysis
 - **Worst Negative Slack (WNS)**: A high positive setup slack margin of **+10.785 ns** ensures reliable operation without timing violations.
-- **Zero Failing Endpoints**: Across 67,083 timing endpoints, zero timing failures occurred during post-routing analysis.
+- **Zero Failing Endpoints**: Across 67,083 timing endpoints, zero timing failures occurred during analysis.
 
 ---
 
-### 3. Vivado Post-Implementation Power Estimation
+### 3. Estimated Power Analysis
 
-On-chip power consumption was estimated post-implementation using Vivado Power Analysis tools under typical operating conditions:
+On-chip power consumption was estimated using Power Analysis tools under typical operating conditions:
 
 | Power Category / Component Subsystem | Estimated Power (Watts) | Percentage of Category | Percentage of Total Power |
 | :--- | :--- | :--- | :--- |
@@ -210,21 +210,21 @@ On-chip power consumption was estimated post-implementation using Vivado Power A
 | **Effective Thermal Resistance ($\Theta JA$)** | 11.5 | °C/W |
 | **Power Analysis Confidence Level** | Medium (Vectorless Activity Analysis) | — |
 
-> **Power Analysis Classification Note**: The reported power metrics represent Vivado post-implementation estimated on-chip thermal power based on switching activity models. Physical hardware power measurements using external power meters/shunts on a physical FPGA development board remain pending.
+> **Power Analysis Classification Note**: The reported power metrics represent estimated on-chip thermal power based on switching activity models. Physical hardware power measurements using external power meters/shunts on a physical FPGA development board remain pending.
 
 ---
 
 ## Scope, Limitations & Future Work
 
 ### Completed Accomplishments
-- Successful C-to-RTL High-Level Synthesis of 2D CNN convolution kernel.
+- Successful C-to-RTL High-Level Synthesis modeling of 2D CNN convolution kernel.
 - Formulated Vitis HLS interface pragmas (`m_axi`, `s_axilite`) and optimization directives (`PIPELINE`, `UNROLL`).
 - Completed C testbench verification (`conv1_hlstb.c`) for functional simulation.
-- Generated post-implementation resource utilization analysis, timing closure analysis, and Vivado power estimation tables.
+- Compiled resource utilization analysis, timing analysis, and power estimation tables.
 
 ### Current Limitations
 - **Physical Hardware Deployment**: Testing on a physical Zynq-7000 development board has not yet been conducted.
-- **Power Measurement**: Power metrics are Vivado synthesis/implementation estimates, not physical board multimeter/oscilloscope measurements.
+- **Power Measurement**: Power metrics are synthesis/simulation estimates, not physical board multimeter/oscilloscope measurements.
 - **End-to-End Inference**: Evaluated kernel covers Layer 1 (`conv1_hls`) convolution computation; full multi-layer CNN network pipeline is not currently deployed.
 
 ### Planned Future Work
